@@ -264,6 +264,8 @@ integer(i4b),parameter           :: iRunModeFull=1             ! named variable 
 integer(i4b),parameter           :: iRunModeGRU=2              ! named variable defining running mode as GRU-parallelization run (GRU subset)
 integer(i4b),parameter           :: iRunModeHRU=3              ! named variable defining running mode as single-HRU run (ONE HRU)
 character(len=128)               :: fmtGruOutput               ! a format string used to write start and end GRU in output file names
+! option to resume simulation even solver fails
+logical(lgt)                     :: resumeFailSolver=.false.   ! flag to resume solver when it failed (not converged)
 ! *****************************************************************************
 ! (1) inital priming -- get command line arguments, identify files, etc.
 ! *****************************************************************************
@@ -925,6 +927,7 @@ do modelTimeStep=1,numtim
                    output_fileSuffix,                           & ! intent(in):    name of the experiment used in the restart file
                    dt_init(iGRU)%hru(localHRU),                 & ! intent(inout): initial time step
                    computeVegFluxFlag,                          & ! intent(inout): flag to indicate if we are computing fluxes over vegetation (.false. means veg is buried with snow)
+                   resumeFailSolver,                            & ! flag whether simulation continues if solver does not converge 
                    ! data structures (input)
                    timeStruct,                                  & ! intent(in):    model time data
                    typeStruct%gru(iGRU)%hru(localHRU),          & ! intent(in):    local classification of soil veg etc. for each HRU
@@ -1101,6 +1104,11 @@ contains
  do iArgument= 1, nArgument
   if (nLocalArgument>0) then; nLocalArgument = nLocalArgument -1; cycle; end if ! skip the arguments have been read 
   select case (trim(argString(iArgument)))
+   case ('-r', '--resume')
+    ! define file suffix
+    nLocalArgument = 0
+    resumeFailSolver = .true.
+    print "(A)", "Simulation will continue even if the solver does NOT converge."
    case ('-s', '--suffix')
     ! define file suffix
     nLocalArgument = 1

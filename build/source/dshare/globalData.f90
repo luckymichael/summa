@@ -164,5 +164,4 @@ MODULE globalData
  integer(i4b),dimension(maxFreq),save,public :: outFreq                 ! frequency of all output files
 
 
-
 END MODULE globalData
