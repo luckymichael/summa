@@ -192,7 +192,6 @@ contains
  integer(i4b)                         :: nTrial                 ! number of trial sub-steps
  logical(lgt)                         :: firstStep              ! flag to denote if the first time step
  logical(lgt)                         :: rejectedStep           ! flag to denote if the sub-step is rejected (convergence problem, etc.)
- logical(lgt)                         :: forceConverge=.false.  ! flag to denote if the constrained explicit Euler solution is used to force convergence
  logical(lgt),parameter               :: checkTimeStepping=.false.      ! flag to denote a desire to check the time stepping 
  logical(lgt),parameter               :: backwardsCompatibility=.true.  ! flag to denote a desire to ensure backwards compatibility with previous branches. 
  ! balance checks
