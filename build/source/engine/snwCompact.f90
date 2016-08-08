@@ -139,7 +139,7 @@ contains
   weightSnow = weightSnow + halfweight          ! add half of the weight from the current layer
   ! *** compute the compaction rate associated with snow melt (s-1)
   ! NOTE: loss of ice due to snowmelt is implicit, so can be updated directly
-  if(iden_ice*mLayerVolFracIceNew(iSnow) < snwDensityMax)then ! only collapse layers if below a critical density
+  if(iden_ice*mLayerVolFracIceNew(iSnow) + mLayerMeltFreeze(iSnow) < snwDensityMax)then ! only collapse layers if below a critical density
    ! (compute volumetric losses of ice due to melt and sublimation)
    if(iSnow==1)then  ! if top snow layer include sublimation and melt
     volFracIceLoss = max(0._dp,mLayerMeltFreeze(iSnow)/iden_ice - dt*(scalarSnowSublimation/mLayerDepth(iSnow))/iden_ice )
