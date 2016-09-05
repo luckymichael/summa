@@ -78,6 +78,7 @@ function summa_before_install {
 function summa_install {
     echo summa_install
     cd ${TRAVIS_BUILD_DIR}
+    chmod  +x build/getVersion.bash
     sed -i "s/FC =.*/FC = gfortran-6/" build/Makefile
     sed -i "s|F_MASTER =.*|F_MASTER = ${TRAVIS_BUILD_DIR}|" build/Makefile
     sed -i "s|NCDF_PATH =.*|NCDF_PATH = ${INSTALLDIR}|" build/Makefile
