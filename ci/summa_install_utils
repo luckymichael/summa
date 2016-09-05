@@ -81,7 +81,7 @@ function summa_install {
     sed -i "s/FC =.*/FC = gfortran-6/" build/Makefile
     sed -i "s|F_MASTER =.*|F_MASTER = ${TRAVIS_BUILD_DIR}|" build/Makefile
     sed -i "s|NCDF_PATH =.*|NCDF_PATH = ${INSTALLDIR}|" build/Makefile
-    make -C build/ -f Makefile &> make.log
+    make -C build/ -f Makefile 
 }
 
 function summa_script {
