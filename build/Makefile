@@ -270,6 +270,9 @@ DRIVER = $(patsubst %, $(DRIVER_DIR)/%, $(SUMMA_DRIVER))
 # Define the executable
 DRIVER__EX = summa.exe
 
+# define version number
+VERSION = 1.9.0
+
 #========================================================================
 # PART 3: Checks
 #======================================================================
@@ -310,6 +313,10 @@ check:
 	$(info   FLAGS_SUMMA: $(FLAGS_SUMMA))
 	$(info Add $(NCDF_PATH)/lib to your LD_LIBRARY_PATH)
 	$(info)
+
+# update version information
+update_version:
+	$(MOD_PATH)/getVersion.bash $(DRIVER) $(VERSION)
 
 # compile Noah-MP routines
 compile_noah:

@@ -337,7 +337,8 @@ contains
  ! get the mapping between the full state vector and the state subset
  ixMapFull2Subset( pack(ixAllState,      stateSubsetMask) ) = arth(1,1,nSubset)  ! indices in the state subset
  ixMapFull2Subset( pack(ixAllState, .not.stateSubsetMask) ) = integerMissing
-
+ print *, 'stateSubsetMask', stateSubsetMask
+ print *, 'ixAllState', ixAllState
  ! -----
  ! - get vectors of different state subsets...
  ! -------------------------------------------
@@ -430,10 +431,14 @@ contains
  ixSnowSoilNrg = ixMapFull2Subset(ixNrgLayer)                    ! both snow and soil layers
  ixSnowOnlyNrg = ixMapFull2Subset(ixNrgLayer(      1:nSnow  ))   ! snow layers only
  ixSoilOnlyNrg = ixMapFull2Subset(ixNrgLayer(nSnow+1:nLayers))   ! soil layers only
-
+ print *, 'ixSnowSoilNrg',ixSnowSoilNrg
+ print *, 'ixSnowOnlyNrg',ixSnowOnlyNrg
+ print *, 'ixSoilOnlyNrg',ixSoilOnlyNrg
  ! get list of indices for hydrology
  ! NOTE: layers not in the state subset will be missing
  ixSnowSoilHyd = ixMapFull2Subset(ixHydLayer)                    ! both snow and soil layers
+ print *, ixMapFull2Subset(ixHydLayer)
+ print *, ixHydLayer
  ixSnowOnlyHyd = ixMapFull2Subset(ixHydLayer(      1:nSnow  ))   ! snow layers only
  ixSoilOnlyHyd = ixMapFull2Subset(ixHydLayer(nSnow+1:nLayers))   ! soil layers only
 
@@ -446,6 +451,9 @@ contains
  nSnowSoilHyd = count(ixSnowSoilHyd/=integerMissing)
  nSnowOnlyHyd = count(ixSnowOnlyHyd/=integerMissing)
  nSoilOnlyHyd = count(ixSoilOnlyHyd/=integerMissing)
+ print *, 'ixSnowSoilHyd',ixSnowSoilHyd
+ print *, 'ixSnowOnlyHyd',ixSnowOnlyHyd
+ print *, 'ixSoilOnlyHyd',ixSoilOnlyHyd
 
  ! end association to data in structures
  end associate subsetState

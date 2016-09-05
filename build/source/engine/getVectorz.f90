@@ -227,6 +227,12 @@ contains
  ! check that we populated all state variables
  if(count(stateFlag)/=nState)then
   message=trim(message)//'some state variables unpopulated'
+  print *, 'nSnowSoilNrg, nSnowSoilHyd', nSnowSoilNrg, nSnowSoilHyd
+  print *, 'count', count(stateFlag), stateFlag
+  print *, 'ixSnowSoilNrg',ixSnowSoilNrg(1:nLayers)
+  print *, 'ixSnowSoilHyd',ixSnowSoilHyd(1:nLayers)
+  print *, 'ixHydType',ixHydType
+  print *, 'ixSnowSoilNrg',ixSnowSoilNrg
   err=20; return
  endif
 

@@ -1072,7 +1072,11 @@ contains
  integer(i4b)                     :: nArgument                  ! number of command line arguments 
  character(len=256),allocatable   :: argString(:)               ! string to store command line arguments
  integer(i4b)                     :: nLocalArgument             ! number of command line arguments to read for a switch
-
+ ! version information generated during compiling
+character(len=64), parameter     :: summaVersion = '1.1.1'
+character(len=64), parameter     :: gitBranch = 'feature/splitOperations-0-g7afc46c-dirty'
+character(len=64), parameter     :: gitHash = '7afc46c7027aebc08f93a2c3fad598cc2e8df6f7'
+character(len=64), parameter     :: buildTime = 'Sat, Sep  3, 2016  1:41:59 PM'
  nArgument = command_argument_count()   
  ! check numbers of command-line arguments and obtain all arguments 
  if (nArgument < 1) then 
@@ -1146,7 +1150,7 @@ contains
     else
      print '(A)', ' GRU-Parallelization run activated. '//trim(argString(iArgument+2))//' GRUs are selected for simulation.'
     end if
-
+    
    case ('-h','--help')
     call printCommandHelp
 
@@ -1179,6 +1183,7 @@ contains
  print "(A)",  ' -g --gru           Run a subset of countGRU GRUs starting from index startGRU'
  print "(A)",  ' -c --checkhru      Run a single HRU with index of checkHRU'
  print "(A)",  ' -r --resume        Continue simulation when solver failed convergence'
+ print "(A)",  ' -v --version       Display version infotmation of the current built'
  stop 
  end subroutine printCommandHelp
 
