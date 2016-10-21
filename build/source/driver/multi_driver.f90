@@ -1228,6 +1228,7 @@ contains
  print "(A)",  ' -g --gru           Run a subset of countGRU GRUs starting from index startGRU'
  print "(A)",  ' -h --hru           Run a single HRU with index of iHRU'
  print "(A)",  ' -c --continue      Continue simulation when solver failed convergence'
+ print "(A)",  ' -o --output        Define frequency [y,m,d] to split netcdf files'
  print "(A)",  ' -r --restart       Define frequency [y,m,d] to write restart files'
  print "(A)",  ' -p --progress      Define frequency [m,d,h] to print progress'
  stop 
