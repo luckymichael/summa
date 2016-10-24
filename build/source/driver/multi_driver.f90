@@ -114,6 +114,7 @@ USE globalData,only:structInfo                              ! information on the
 USE globalData,only:numtim                                  ! number of time steps
 USE globalData,only:urbanVegCategory                        ! vegetation category for urban areas
 USE globalData,only:globalPrintFlag                         ! global print flag
+use globalData,only:ncMaxDay                                ! maximum number of days in an output netcdf file
 USE multiconst,only:integerMissing                          ! missing integer value
 ! provide access to Noah-MP parameters
 USE NOAHMP_VEG_PARAMETERS,only:SAIM,LAIM                    ! 2-d tables for stem area index and leaf area index (vegType,month)
@@ -1098,6 +1099,7 @@ contains
  startGRU = integerMissing; nGRU = integerMissing; checkHRU = integerMissing; nHRU = integerMissing
  nGRU = integerMissing; nHRU = integerMissing
  iRunMode = iRunModeFull
+ ncMaxDay = 366
 
  ! loop through all command arguments
  nLocalArgument = 0
@@ -1189,10 +1191,10 @@ contains
     ! check if the number of command line arguments is correct
     if (iArgument+nLocalArgument>nArgument) call handle_err(1, "missing argument freqOutput; type 'summa.exe --help' for correct usage")
     select case (trim(argString(iArgument+1)))
-     case ('y' , 'year');  ixNetCDF = ixNetCDF_iy
-     case ('m' , 'month'); ixNetCDF = ixNetCDF_im
-     case ('d' , 'day');   ixNetCDF = ixNetCDF_id
-     case ('n' , 'never'); ixNetCDF = ixNetCDF_never
+     case ('y' , 'year');  ixNetCDF = ixNetCDF_iy; ncMaxDay = 366
+     case ('m' , 'month'); ixNetCDF = ixNetCDF_im; ncMaxDay = 31
+     case ('d' , 'day');   ixNetCDF = ixNetCDF_id; ncMaxDay = 1
+     case ('n' , 'never'); ixNetCDF = ixNetCDF_never; ncMaxDay = ceiling(365.25*(finshTime%var(iLookTIME%iyyy)-startTime%var(iLookTIME%iyyy)+1))
      case default;         call handle_err(1,'unknown frequency to split netcdf files')
     end select 
  
