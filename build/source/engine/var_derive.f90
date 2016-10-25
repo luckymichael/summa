@@ -132,7 +132,8 @@ contains
  integer(i4b)                    :: iLayer          ! loop through layers
  real(dp)                        :: fracRootLower   ! fraction of the rooting depth at the lower interface
  real(dp)                        :: fracRootUpper   ! fraction of the rooting depth at the upper interface
-
+ real(dp), parameter             :: rootTolerance = 0.05_dp ! tolerance for error in doubleExp rooting option
+ real(dp)                        :: error           ! machine precision error in rooting distribution
  ! initialize error control
  err=0; message='rootDensty/'
 
@@ -148,6 +149,7 @@ contains
  rootingDepth          =>parData(iLookPARAM%rootingDepth),                      & ! rooting depth (m)
  rootDistExp           =>parData(iLookPARAM%rootDistExp),                       & ! root distribution exponent (-)
  ! associate the model index structures
+ nSoil                 =>indx_data%var(iLookINDEX%nSoil)%dat(1),                & ! number of soil layers
  nSnow                 =>indx_data%var(iLookINDEX%nSnow)%dat(1),                & ! number of snow layers
  nLayers               =>indx_data%var(iLookINDEX%nLayers)%dat(1),              & ! total number of layers
  iLayerHeight          =>prog_data%var(iLookPROG%iLayerHeight)%dat,             & ! height of the layer interface (m)
@@ -197,10 +199,14 @@ contains
 
  end do  ! (looping thru layers)
 
- ! check that root density is less than one
- if(sum(mLayerRootDensity) > 1._dp + epsilon(rootingDepth))then
+ ! check that root density is within some reaosnable version of machine tolerance
+ ! This is the case when root density is greater than 1. Can only happen with powerLaw option.
+ error = sum(mLayerRootDensity) - 1._dp
+ if (error > 2._dp*epsilon(rootingDepth)) then
   message=trim(message)//'problem with the root density calaculation'
   err=20; return
+ else
+  mLayerRootDensity = mLayerRootDensity - error/real(nSoil,kind(dp))
  end if
 
  ! compute fraction of roots in the aquifer
@@ -211,15 +217,18 @@ contains
  end if
  
  ! check that roots in the aquifer are appropriate
- if(scalarAquiferRootFrac > epsilon(rootingDepth))then
-  if(ixGroundwater /= bigBucket)then
+ if ((ixGroundwater /= bigBucket).and.(scalarAquiferRootFrac > 2._dp*epsilon(rootingDepth)))then
+  if(scalarAquiferRootFrac < rootTolerance) then
+   mLayerRootDensity = mLayerRootDensity + scalarAquiferRootFrac/real(nSoil, kind(dp))
+   scalarAquiferRootFrac = 0._dp
+  else
    select case(ixRootProfile)
     case(powerLaw);  message=trim(message)//'roots in the aquifer only allowed for the big bucket gw parameterization: check that rooting depth < soil depth'
     case(doubleExp); message=trim(message)//'roots in the aquifer only allowed for the big bucket gw parameterization: increase soil depth to alow for exponential roots'
    end select
    err=10; return
-  end if  ! if not the big bucket
- end if  ! if roots in the aquifer
+  end if  ! if roots in the aquifer
+ end if  ! if not the big bucket
 
  end associate
 
@@ -312,7 +321,7 @@ contains
     err=10; return
   end select
   !if(iLayer > nSnow)& ! avoid layer 0
-  ! write(*,'(i4,1x,2(f11.5,1x,e20.10,1x))') iLayer, mLayerHeight(iLayer), mLayerSatHydCond(iLayer-nSnow), iLayerHeight(iLayer), iLayerSatHydCond(iLayer-nSnow)
+  ! write(*,'(a,1x,i4,1x,2(f11.5,1x,e20.10,1x))') 'satHydCond: ', iLayer, mLayerHeight(iLayer), mLayerSatHydCond(iLayer-nSnow), iLayerHeight(iLayer), iLayerSatHydCond(iLayer-nSnow)
  end do  ! looping through soil layers
  !print*, trim(model_decisions(iLookDECISIONS%hc_profile)%cDecision)
  !print*, 'k_soil, k_macropore, zScale_TOPMODEL = ', k_soil, k_macropore, zScale_TOPMODEL
