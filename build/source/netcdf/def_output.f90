@@ -30,6 +30,7 @@ public :: def_output
 
 ! define dimension names
 character(len=32),parameter :: hru_DimName            = 'hru'              ! dimension name for the HRUs
+character(len=32),parameter :: depth_DimName          = 'depth'            ! dimension name for soil depth
 character(len=32),parameter :: scalar_DimName         = 'scalar'           ! dimension name for scalar variables
 character(len=32),parameter :: wLength_dimName        = 'spectral_bands'   ! dimension name for the number of spectral bands
 character(len=32),parameter :: timestep_DimName       = 'time'             ! dimension name for the time step
@@ -43,6 +44,7 @@ character(len=32),parameter :: ifcTotoAndTime_DimName = 'ifcTotoAndTime'   ! dim
 
 ! define the dimension IDs
 integer(i4b)                :: hru_DimID                               ! dimension name for the HRUs
+integer(i4b)                :: depth_DimID                             ! dimension name for the soil depth
 integer(i4b)                :: scalar_DimID                            ! dimension name for scalar variables
 integer(i4b)                :: wLength_dimID                           ! dimension name for the number of spectral bands
 integer(i4b)                :: timestep_DimID                          ! dimension name for the time step
@@ -96,23 +98,15 @@ contains
  ! e.g., xxxxxxxxx_1.nc  (for output at every model timestep)
  ! e.g., xxxxxxxxx_24.nc (for daily output with hourly model timestep)
  do iFreq = 1,nFreq
+
+  ! create file
   write(fstring,'(i5)') outFreq(iFreq)
   fstring = adjustl(fstring)
   fname = trim(infile)//'_'//trim(fstring)//'.nc'
   call ini_create(nHRU,nSoil,trim(fname),ncid(iFreq),err,cmessage)
   if(err/=0)then; message=trim(message)//trim(cmessage); return; end if
   print "(A,A)",'Created output file:',trim(fname)
- end do
 
- ! define model decisions
- do iVar = 1,size(model_decisions)
-  if(model_decisions(iVar)%iDecision.ne.integerMissing)then
-   call put_attrib(ncid(modelTime),model_decisions(iVar)%cOption,model_decisions(iVar)%cDecision,err,cmessage)
-   if(err/=0)then; message=trim(message)//trim(cmessage); return; end if
-  end if
- end do
-
- do iFreq = 1,nFreq
   do iStruct = 1,size(structInfo)
    select case (trim(structInfo(iStruct)%structName))
     case('attr' ); call def_variab(ncid(iFreq),iFreq,needHRU,  noTime,attr_meta, nf90_double,err,cmessage)  ! local attributes HRU
@@ -132,6 +126,14 @@ contains
    ! error handling
    if(err/=0)then;err=20;message=trim(message)//trim(cmessage)//'[structure =  '//trim(structInfo(iStruct)%structName);return;end if
   end do ! iStruct 
+
+  ! define model decisions
+  do iVar = 1,size(model_decisions)
+   if(model_decisions(iVar)%iDecision.ne.integerMissing)then
+    call put_attrib(ncid(modelTime),model_decisions(iVar)%cOption,model_decisions(iVar)%cDecision,err,cmessage)
+    if(err/=0)then; message=trim(message)//trim(cmessage); return; end if
+   end if
+  end do
 
  end do ! iFreq 
 
@@ -154,7 +156,7 @@ contains
  implicit none
  ! declare dummy variables
  integer(i4b),intent(in)     :: nHRU                       ! number of HRUs
- integer(i4b), intent(in)    :: nSoil                      ! number of soil layers in the first HRU (used to define fixed length dimensions)
+ integer(i4b),intent(in)     :: nSoil                      ! number of soil layers in the first HRU (used to define fixed length dimensions)
  character(*),intent(in)     :: infile                     ! filename
  integer(i4b),intent(out)    :: ncid                       ! netcdf file id
  integer(i4b),intent(out)    :: err                        ! error code
@@ -184,9 +186,10 @@ contains
  message='iCreate[create]'; call netcdf_err(err,message); if (err/=0) return
 
  ! create dimensions
- err = nf90_def_dim(ncid, trim(      timestep_DimName), nf90_unlimited,   timestep_DimID); message='iCreate[time]';     call netcdf_err(err,message); if (err/=0) return
- err = nf90_def_dim(ncid, trim(        scalar_DimName), scalarLength,       scalar_DimID); message='iCreate[scalar]';   call netcdf_err(err,message); if (err/=0) return
  err = nf90_def_dim(ncid, trim(           hru_DimName), nHRU,                  hru_DimID); message='iCreate[HRU]';      call netcdf_err(err,message); if (err/=0) return
+ err = nf90_def_dim(ncid, trim(      timestep_DimName), nf90_unlimited,   timestep_DimID); message='iCreate[time]';     call netcdf_err(err,message); if (err/=0) return
+ err = nf90_def_dim(ncid, trim(         depth_DimName), nSoil,               depth_DimID); message='iCreate[depth]';    call netcdf_err(err,message); if (err/=0) return
+ err = nf90_def_dim(ncid, trim(        scalar_DimName), scalarLength,       scalar_DimID); message='iCreate[scalar]';   call netcdf_err(err,message); if (err/=0) return
  err = nf90_def_dim(ncid, trim(       wLength_DimName), maxSpectral,       wLength_DimID); message='iCreate[spectral]'; call netcdf_err(err,message); if (err/=0) return
  err = nf90_def_dim(ncid, trim(       routing_DimName), maxRouting,        routing_DimID); message='iCreate[routing]';  call netcdf_err(err,message); if (err/=0) return
  err = nf90_def_dim(ncid, trim(midSnowAndTime_DimName), maxLength,  midSnowAndTime_DimID); message='iCreate[midSnow]';  call netcdf_err(err,message); if (err/=0) return
@@ -290,6 +293,7 @@ contains
     case(iLookvarType%ifcSnow); call cloneStruc(dimensionIDs, lowerBound=1, source=(/hru_DimID, ifcSnowAndTime_DimID               /), err=err, message=cmessage)
     case(iLookvarType%ifcSoil); call cloneStruc(dimensionIDs, lowerBound=1, source=(/hru_DimID, ifcSoilAndTime_DimID               /), err=err, message=cmessage)
     case(iLookvarType%ifcToto); call cloneStruc(dimensionIDs, lowerBound=1, source=(/hru_DimID, ifcTotoAndTime_DimID               /), err=err, message=cmessage)
+    case(iLookvarType%parSoil); call cloneStruc(dimensionIDs, lowerBound=1, source=(/hru_DimID, depth_DimID                        /), err=err, message=cmessage)
     case(iLookvarType%routing); call cloneStruc(dimensionIDs, lowerBound=1, source=(/routing_DimID                                 /), err=err, message=cmessage)
    end select
    ! check errors
