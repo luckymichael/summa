@@ -181,13 +181,20 @@ contains
       message=trim(message)//'expect 2nd dimension of 2-d variable to be depth (dimension name = '//trim(dimName)//')'
       err=20; return
      endif
-  
+
      ! check that the dimension length is correct
-     if(size(mparStruct%gru(iGRU)%hru(localHRU)%var(ixParam)%dat) /= nSoil_file)then
-      message=trim(message)//'unexpected number of soil layers in parameter file'
-      err=20; return
-     endif
- 
+     print *, parName
+     do iHRU=1,nHRU  
+      ! map to the GRUs and HRUs    
+      iGRU=index_map(iHRU)%gru_ix
+      localHRU=index_map(iHRU)%localHRU
+      if(size(mparStruct%gru(iGRU)%hru(localHRU)%var(ixParam)%dat) /= nSoil_file)then
+       message=trim(message)//'unexpected number of soil layers in parameter file'
+       print *, parName, size(mparStruct%gru(iGRU)%hru(localHRU)%var(ixParam)%dat)
+       err=20; return
+      endif
+     end do
+
      ! define parameter length
      parLength = nSoil_file
  
