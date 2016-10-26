@@ -132,6 +132,7 @@ contains
   ! get the parameter name
   err=nf90_inquire_variable(ncid, ivarid, name=parName)
   call netcdf_err(err,message); if (err/=0) then; err=20; return; end if
+  if (trim(parName)=='depth') cycle
 
   ! **********************************************************************************************
   ! * read the HRU index
@@ -183,14 +184,12 @@ contains
      endif
 
      ! check that the dimension length is correct
-     print *, parName
      do iHRU=1,nHRU  
       ! map to the GRUs and HRUs    
       iGRU=index_map(iHRU)%gru_ix
       localHRU=index_map(iHRU)%localHRU
       if(size(mparStruct%gru(iGRU)%hru(localHRU)%var(ixParam)%dat) /= nSoil_file)then
        message=trim(message)//'unexpected number of soil layers in parameter file'
-       print *, parName, size(mparStruct%gru(iGRU)%hru(localHRU)%var(ixParam)%dat)
        err=20; return
       endif
      end do
