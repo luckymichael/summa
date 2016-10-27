@@ -273,7 +273,6 @@ contains
 
  end do ! (looping through the parameters in the NetCDF file)
 
- print*, 'mparStruct%gru(1)%hru(1)%var(iLookPARAM%theta_sat)%dat(:) = ', mparStruct%gru(1)%hru(1)%var(iLookPARAM%theta_sat)%dat(:)
 
  end subroutine read_param
 
