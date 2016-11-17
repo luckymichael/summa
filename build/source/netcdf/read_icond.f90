@@ -226,12 +226,6 @@ contains
   err = nf90_get_var(ncID,ncVarID,varData); call netcdf_err(err,message) 
   if(err/=0)then; message=trim(message)//': problem getting the data'; return; endif
 
-  ! check data are not set to the fill value
-  if( any( abs(varData - nf90_fill_double) < epsilon(varData) ) )then   
-   message=trim(message)//"data set to the fill value (name='"//trim(prog_meta(iVar)%varName)//"')"
-   err=20; return
-  endif
-
   ! store data in prognostics structure 
   ! loop through GRUs
   do iGRU = 1,nGRU
@@ -242,17 +236,23 @@ contains
     nSoil = gru_struc(iGRU)%hruInfo(iHRU)%nSoil 
     nToto = nSnow + nSoil 
    
-    ! put the data into data structures
+
     select case (prog_meta(iVar)%varType)
-     case (iLookVarType%scalarv); progData%gru(iGRU)%hru(iHRU)%var(iVar)%dat(1        ) = varData(gru_struc(iGRU)%hruInfo(iHRU)%hru_nc,1        ) 
-     case (iLookVarType%midSoil); progData%gru(iGRU)%hru(iHRU)%var(iVar)%dat(1:nSoil  ) = varData(gru_struc(iGRU)%hruInfo(iHRU)%hru_nc,1:nSoil  ) 
-     case (iLookVarType%midToto); progData%gru(iGRU)%hru(iHRU)%var(iVar)%dat(1:nToto  ) = varData(gru_struc(iGRU)%hruInfo(iHRU)%hru_nc,1:nToto  ) 
-     case (iLookVarType%ifcToto); progData%gru(iGRU)%hru(iHRU)%var(iVar)%dat(0:nToto  ) = varData(gru_struc(iGRU)%hruInfo(iHRU)%hru_nc,1:nToto+1) 
+     case (iLookVarType%scalarv); i1=1;i2=1    ;j1=1;j2=1
+     case (iLookVarType%midSoil); i1=1;i2=nSoil;j1=1;j2=nSoil 
+     case (iLookVarType%midToto); i1=1;i2=nToto;j1=1;j2=nToto 
+     case (iLookVarType%ifcToto); i1=0;i2=nToto;j1=1;j2=nToto+1 
      case default
       message=trim(message)//"unexpectedVariableType[name='"//trim(prog_meta(iVar)%varName)//"';type='"//trim(get_varTypeName(prog_meta(iVar)%varType))//"']"
       err=20; return
     end select
-
+    ! check data are not set to the fill value
+    if( any( abs(varData(gru_struc(iGRU)%hruInfo(iHRU)%hru_nc, j1:j2) - nf90_fill_double) < epsilon(varData) ) )then
+     message=trim(message)//"data set to the fill value (name='"//trim(prog_meta(iVar)%varName)//"')"
+     err=20; return
+    end if
+    ! put the data into data structures
+    progData%gru(iGRU)%hru(iHRU)%var(iVar)%dat(i1:i2) = varData(gru_struc(iGRU)%hruInfo(iHRU)%hru_nc,j1:j2) 
     ! initialize the spectral albedo
     progData%gru(iGRU)%hru(iHRU)%var(iLookPROG%spectralSnowAlbedoDiffuse)%dat(1:nBand) = progData%gru(iGRU)%hru(iHRU)%var(iLookPROG%scalarSnowAlbedo)%dat(1)
 
