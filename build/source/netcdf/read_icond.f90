@@ -158,6 +158,7 @@ contains
  real(dp),allocatable                   :: varData(:,:) ! variable data storage        
  integer(i4b)                           :: nSoil, nSnow, nToto ! # layers
  integer(i4b),parameter                 :: nBand=2      ! number of spectral bands
+ integer(i4b)                           :: i1,i2,j1,j2  ! bounds of intital codition arrays 
 
  character(len=32),parameter            :: scalDimName   ='scalarv'  ! dimension name for scalar data
  character(len=32),parameter            :: midSoilDimName='midSoil'  ! dimension name for soil-only layers
