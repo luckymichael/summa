@@ -1194,7 +1194,7 @@ contains
      case ('y' , 'year');  ixNetCDF = ixNetCDF_iy; ncMaxDay = 366
      case ('m' , 'month'); ixNetCDF = ixNetCDF_im; ncMaxDay = 31
      case ('d' , 'day');   ixNetCDF = ixNetCDF_id; ncMaxDay = 1
-     case ('n' , 'never'); ixNetCDF = ixNetCDF_never; ncMaxDay = ceiling(365.25*(finshTime%var(iLookTIME%iyyy)-startTime%var(iLookTIME%iyyy)+1))
+     case ('n' , 'never'); ixNetCDF = ixNetCDF_never; ncMaxDay = int(365.25*200)
      case default;         call handle_err(1,'unknown frequency to split netcdf files')
     end select 
  
