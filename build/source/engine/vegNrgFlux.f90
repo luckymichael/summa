@@ -2146,7 +2146,14 @@ contains
   end select  ! vegetation traits (z0, zpd)
 
   ! correct for snow depth
-  if(zeroPlaneDisplacement < snowDepth) zeroPlaneDisplacement = snowDepth
+  if(zeroPlaneDisplacement < snowDepth) then
+   if (snowDepth + z0Canopy < heightCanopyTop) then
+    zeroPlaneDisplacement = snowDepth
+   else
+    zeroPlaneDisplacement = (heightCanopyTop - snowDepth) * zeroPlaneDisplacement / heightCanopyTop + snowDepth
+    z0Canopy = (heightCanopyTop - snowDepth) * z0Canopy / heightCanopyTop
+   end if
+  end if
 
   ! check that everything is consistent
   if(zeroPlaneDisplacement < heightCanopyBottom)then; err=20; message=trim(message)//'zero plane displacement is below the canopy bottom'; return; end if
