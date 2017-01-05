@@ -114,7 +114,8 @@ USE globalData,only:structInfo                              ! information on the
 USE globalData,only:numtim                                  ! number of time steps
 USE globalData,only:urbanVegCategory                        ! vegetation category for urban areas
 USE globalData,only:globalPrintFlag                         ! global print flag
-USE multiconst,only:integerMissing                          ! missing integer value
+USE globalData,only:integerMissing                          ! missing integer value
+use globalData,only:ncMaxDay                                ! maximum number of days in an output netcdf file
 ! provide access to Noah-MP parameters
 USE NOAHMP_VEG_PARAMETERS,only:SAIM,LAIM                    ! 2-d tables for stem area index and leaf area index (vegType,month)
 USE NOAHMP_VEG_PARAMETERS,only:HVT,HVB                      ! height at the top and bottom of vegetation (vegType)
@@ -185,7 +186,7 @@ integer(i4b)                     :: nGRU                       ! number of group
 integer(i4b)                     :: nHRU                       ! number of global hydrologic response units
 integer(i4b)                     :: hruCount                   ! number of local hydrologic response units
 integer(i4b)                     :: modelTimeStep=0            ! index of model time step
-integer(i4b)                     :: waterYearTimeStep=0        ! index of water year
+integer(i4b)                     :: netcdfTimeStep=0           ! index of water year
 integer(i4b),dimension(maxFreq)  :: outputTimeStep=0           ! timestep in output files
 ! define the time output
 logical(lgt)                     :: printProgress              ! flag to print progress
@@ -201,6 +202,13 @@ integer(i4b),parameter           :: ixRestart_im=1001          ! named variable 
 integer(i4b),parameter           :: ixRestart_id=1002          ! named variable to print a re-start file once per day
 integer(i4b),parameter           :: ixRestart_never=1003       ! named variable to print a re-start file never
 integer(i4b)                     :: ixRestart=ixRestart_iy     ! define frequency to write restart files
+! define frequency to split netcdf output files
+logical(lgt)                     :: splitNetCDF                ! flag to split the netcdf file
+integer(i4b),parameter           :: ixNetCDF_iy=1000           ! named variable to split a netcdf file once per year
+integer(i4b),parameter           :: ixNetCDF_im=1001           ! named variable to split a netcdf file once per month
+integer(i4b),parameter           :: ixNetCDF_id=1002           ! named variable to split a netcdf file once per day
+integer(i4b),parameter           :: ixNetCDF_never=1003        ! named variable to split a netcdf file never
+integer(i4b)                     :: ixNetCDF=ixNetCDF_iy       ! define frequency to split netcdf files
 ! define output file
 integer(i4b)                     :: ctime1(8)                  ! initial time
 character(len=256)               :: output_fileSuffix=''       ! suffix for the output file
@@ -264,7 +272,6 @@ integer(i4b),parameter           :: iRunModeFull=1             ! named variable 
 integer(i4b),parameter           :: iRunModeGRU=2              ! named variable defining running mode as GRU-parallelization run (GRU subset)
 integer(i4b),parameter           :: iRunModeHRU=3              ! named variable defining running mode as single-HRU run (ONE HRU)
 character(len=128)               :: fmtGruOutput               ! a format string used to write start and end GRU in output file names
-! option to resume simulation even solver fails
 logical(lgt)                     :: resumeFailSolver=.false.   ! flag to resume solver when it failed (not converged)
 ! *****************************************************************************
 ! (1) inital priming -- get command line arguments, identify files, etc.
@@ -385,7 +392,8 @@ call ffile_info(nGRU,err,message); call handle_err(err,message)
 ! (4c) read model decisions
 ! *****************************************************************************
 call mDecisions(err,message); call handle_err(err,message)
-
+! define the maximum day for the netcdf file
+if (ncMaxDay < 0) ncMaxDay = 366 * (finshTime%var(iLookTIME%iyyy) - startTime%var(iLookTIME%iyyy) + 1)
 ! *****************************************************************************
 ! (4d) allocate space for output statistics data structures
 ! *****************************************************************************
@@ -662,7 +670,12 @@ select case (iRunMode)
  case(iRunModeHRU)
   write(output_fileSuffix((len_trim(output_fileSuffix)+1):len(output_fileSuffix)),"('_H',i0)") checkHRU
 end select
-fileout = trim(OUTPUT_PATH)//trim(OUTPUT_PREFIX)//'spinup'//trim(output_fileSuffix)
+write(fileout,'(a,i0,3(a,i2.2),a)') trim(OUTPUT_PATH)//trim(OUTPUT_PREFIX), &
+                               startTime%var(iLookTIME%iyyy), '-', &
+                               startTime%var(iLookTIME%im), '-', &
+                               startTime%var(iLookTIME%id), '-', &
+                               startTime%var(iLookTIME%ih),  &
+                               '_spinup'//trim(output_fileSuffix)
 call def_output(nHRU,gru_struc(1)%hruInfo(1)%nSoil,fileout,err,message); call handle_err(err,message)
  
 ! write local model attributes and parameters to the model output file
@@ -679,7 +692,7 @@ end do ! GRU
 ! (6) loop through time
 ! ****************************************************************************
 ! initialize time step index
-waterYearTimeStep = 1
+netcdfTimeStep = 1
 outputTimeStep(1:nFreq) = 1
 
 do modelTimeStep=1,numtim
@@ -756,11 +769,15 @@ do modelTimeStep=1,numtim
  ! (7) create a new NetCDF output file, and write parameters and forcing data
  ! *****************************************************************************
  ! check the start of a new water year
- if(timeStruct%var(iLookTIME%im)  ==10 .and. &   ! month = October
-    timeStruct%var(iLookTIME%id)  ==1  .and. &   ! day = 1
-    timeStruct%var(iLookTIME%ih)  ==1  .and. &   ! hour = 1
-    timeStruct%var(iLookTIME%imin)==0)then       ! minute = 0
+ select case(ixNetCDF)
+  case(ixNetCDF_iy);    splitNetCDF = (timeStruct%var(iLookTIME%im) == 10 .and. timeStruct%var(iLookTIME%id) == 1 .and. timeStruct%var(iLookTIME%ih) == 0  .and. timeStruct%var(iLookTIME%imin) == 0)
+  case(ixNetCDF_im);    splitNetCDF = (timeStruct%var(iLookTIME%id) == 1 .and. timeStruct%var(iLookTIME%ih) == 0 .and. timeStruct%var(iLookTIME%imin) == 0)
+  case(ixNetCDF_id);    splitNetCDF = (timeStruct%var(iLookTIME%ih) == 0 .and. timeStruct%var(iLookTIME%imin) == 0)
+  case(ixNetCDF_never); splitNetCDF = .false.
+  case default; call handle_err(20,'unable to identify option to split netcdf files')
+ end select
 
+ if (splitNetCDF) then
   ! close any output files that are already open
   do iFreq = 1,nFreq
    if (ncid(iFreq).ne.integerMissing) then
@@ -770,13 +787,17 @@ do modelTimeStep=1,numtim
   end do
  
   ! define the filename
-  write(fileout,'(a,i0,a,i0,a)') trim(OUTPUT_PATH)//trim(OUTPUT_PREFIX),&
-                                 timeStruct%var(iLookTIME%iyyy),'-',timeStruct%var(iLookTIME%iyyy)+1,&
-                                 trim(output_fileSuffix)
-
+  write(fileout,'(a,i4,3(a,i2.2),a)') trim(OUTPUT_PATH)//trim(OUTPUT_PREFIX), &
+                                      timeStruct%var(iLookTIME%iyyy),'-', &
+                                      timeStruct%var(iLookTIME%im),'-', &
+                                      timeStruct%var(iLookTIME%id),'-', &
+                                      timeStruct%var(iLookTIME%ih), &
+                                      trim(output_fileSuffix)
   ! define the file
   call def_output(nHRU,gru_struc(1)%hruInfo(1)%nSoil,fileout,err,message); call handle_err(err,message)
 
+  netcdfTimeStep=1
+  outputTimeStep=1
   ! write parameters for each HRU, and re-set indices
   do iGRU=1,nGRU
    do iHRU=1,gru_struc(iGRU)%hruCount
@@ -784,8 +805,6 @@ do modelTimeStep=1,numtim
     call writeParm(iHRU,typeStruct%gru(iGRU)%hru(iHRU)%var,type_meta,err,message); call handle_err(err,message)
     call writeParm(iHRU,mparStruct%gru(iGRU)%hru(iHRU)%var,mpar_meta,err,message); call handle_err(err,message)
     ! re-initalize the indices for midSnow, midSoil, midToto, and ifcToto
-    waterYearTimeStep=1
-    outputTimeStep=1
     indxStruct%gru(iGRU)%hru(iHRU)%var(iLookINDEX%midSnowStartIndex)%dat(1) = 1
     indxStruct%gru(iGRU)%hru(iHRU)%var(iLookINDEX%midSoilStartIndex)%dat(1) = 1
     indxStruct%gru(iGRU)%hru(iHRU)%var(iLookINDEX%midTotoStartIndex)%dat(1) = 1
@@ -796,7 +815,7 @@ do modelTimeStep=1,numtim
    call writeParm(integerMissing,bparStruct%gru(iGRU)%var,bpar_meta,err,message); call handle_err(err,message)
   end do  ! (looping through GRUs)
 
- end if  ! if start of a new water year, and defining a new file
+ end if  ! if splitting netcdf, and defining a new file
 
  ! ****************************************************************************
  ! (8) loop through HRUs and GRUs
@@ -951,21 +970,21 @@ do modelTimeStep=1,numtim
    end if
 
    ! calculate output Statistics
-   call calcStats(forcStat%gru(iGRU)%hru(iHRU)%var,forcStruct%gru(iGRU)%hru(iHRU)%var,statForc_meta,waterYearTimeStep,err,message);       call handle_err(err,message)
-   call calcStats(progStat%gru(iGRU)%hru(iHRU)%var,progStruct%gru(iGRU)%hru(iHRU)%var,statProg_meta,waterYearTimeStep,err,message);       call handle_err(err,message)
-   call calcStats(diagStat%gru(iGRU)%hru(iHRU)%var,diagStruct%gru(iGRU)%hru(iHRU)%var,statDiag_meta,waterYearTimeStep,err,message);       call handle_err(err,message)
-   call calcStats(fluxStat%gru(iGRU)%hru(iHRU)%var,fluxStruct%gru(iGRU)%hru(iHRU)%var,statFlux_meta,waterYearTimeStep,err,message);       call handle_err(err,message)
-   call calcStats(indxStat%gru(iGRU)%hru(iHRU)%var,indxStruct%gru(iGRU)%hru(iHRU)%var,statIndx_meta,waterYearTimeStep,err,message);       call handle_err(err,message)
+   call calcStats(forcStat%gru(iGRU)%hru(iHRU)%var,forcStruct%gru(iGRU)%hru(iHRU)%var,statForc_meta,netcdfTimeStep,err,message);       call handle_err(err,message)
+   call calcStats(progStat%gru(iGRU)%hru(iHRU)%var,progStruct%gru(iGRU)%hru(iHRU)%var,statProg_meta,netcdfTimeStep,err,message);       call handle_err(err,message)
+   call calcStats(diagStat%gru(iGRU)%hru(iHRU)%var,diagStruct%gru(iGRU)%hru(iHRU)%var,statDiag_meta,netcdfTimeStep,err,message);       call handle_err(err,message)
+   call calcStats(fluxStat%gru(iGRU)%hru(iHRU)%var,fluxStruct%gru(iGRU)%hru(iHRU)%var,statFlux_meta,netcdfTimeStep,err,message);       call handle_err(err,message)
+   call calcStats(indxStat%gru(iGRU)%hru(iHRU)%var,indxStruct%gru(iGRU)%hru(iHRU)%var,statIndx_meta,netcdfTimeStep,err,message);       call handle_err(err,message)
 
    ! write the model output to the NetCDF file
    ! Passes the full metadata structure rather than the stats metadata structure because 
    !  we have the option to write out data of types other than statistics. 
    !  Thus, we must also pass the stats parent->child maps from childStruct.
-   call writeData(waterYearTimeStep,outputTimeStep,forc_meta,forcStat%gru(iGRU)%hru(iHRU)%var,forcStruct%gru(iGRU)%hru(iHRU)%var,forcChild_map,indxStruct%gru(iGRU)%hru(iHRU)%var,gru_struc(iGRU)%hruInfo(iHRU)%hru_ix,err,message); call handle_err(err,message)
-   call writeData(waterYearTimeStep,outputTimeStep,prog_meta,progStat%gru(iGRU)%hru(iHRU)%var,progStruct%gru(iGRU)%hru(iHRU)%var,progChild_map,indxStruct%gru(iGRU)%hru(iHRU)%var,gru_struc(iGRU)%hruInfo(iHRU)%hru_ix,err,message); call handle_err(err,message)
-   call writeData(waterYearTimeStep,outputTimeStep,diag_meta,diagStat%gru(iGRU)%hru(iHRU)%var,diagStruct%gru(iGRU)%hru(iHRU)%var,diagChild_map,indxStruct%gru(iGRU)%hru(iHRU)%var,gru_struc(iGRU)%hruInfo(iHRU)%hru_ix,err,message); call handle_err(err,message)
-   call writeData(waterYearTimeStep,outputTimeStep,flux_meta,fluxStat%gru(iGRU)%hru(iHRU)%var,fluxStruct%gru(iGRU)%hru(iHRU)%var,fluxChild_map,indxStruct%gru(iGRU)%hru(iHRU)%var,gru_struc(iGRU)%hruInfo(iHRU)%hru_ix,err,message); call handle_err(err,message)
-   call writeData(waterYearTimeStep,outputTimeStep,indx_meta,indxStat%gru(iGRU)%hru(iHRU)%var,indxStruct%gru(iGRU)%hru(iHRU)%var,indxChild_map,indxStruct%gru(iGRU)%hru(iHRU)%var,gru_struc(iGRU)%hruInfo(iHRU)%hru_ix,err,message); call handle_err(err,message)
+   call writeData(netcdfTimeStep,outputTimeStep,forc_meta,forcStat%gru(iGRU)%hru(iHRU)%var,forcStruct%gru(iGRU)%hru(iHRU)%var,forcChild_map,indxStruct%gru(iGRU)%hru(iHRU)%var,gru_struc(iGRU)%hruInfo(iHRU)%hru_ix,err,message); call handle_err(err,message)
+   call writeData(netcdfTimeStep,outputTimeStep,prog_meta,progStat%gru(iGRU)%hru(iHRU)%var,progStruct%gru(iGRU)%hru(iHRU)%var,progChild_map,indxStruct%gru(iGRU)%hru(iHRU)%var,gru_struc(iGRU)%hruInfo(iHRU)%hru_ix,err,message); call handle_err(err,message)
+   call writeData(netcdfTimeStep,outputTimeStep,diag_meta,diagStat%gru(iGRU)%hru(iHRU)%var,diagStruct%gru(iGRU)%hru(iHRU)%var,diagChild_map,indxStruct%gru(iGRU)%hru(iHRU)%var,gru_struc(iGRU)%hruInfo(iHRU)%hru_ix,err,message); call handle_err(err,message)
+   call writeData(netcdfTimeStep,outputTimeStep,flux_meta,fluxStat%gru(iGRU)%hru(iHRU)%var,fluxStruct%gru(iGRU)%hru(iHRU)%var,fluxChild_map,indxStruct%gru(iGRU)%hru(iHRU)%var,gru_struc(iGRU)%hruInfo(iHRU)%hru_ix,err,message); call handle_err(err,message)
+   call writeData(netcdfTimeStep,outputTimeStep,indx_meta,indxStat%gru(iGRU)%hru(iHRU)%var,indxStruct%gru(iGRU)%hru(iHRU)%var,indxChild_map,indxStruct%gru(iGRU)%hru(iHRU)%var,gru_struc(iGRU)%hruInfo(iHRU)%hru_ix,err,message); call handle_err(err,message)
   
    ! increment the model indices
    nLayers = gru_struc(iGRU)%hruInfo(iHRU)%nSnow + gru_struc(iGRU)%hruInfo(iHRU)%nSoil
@@ -1001,19 +1020,19 @@ do modelTimeStep=1,numtim
   end associate
  
   ! calc basin stats 
-  call calcStats(bvarStat%gru(iGRU)%var(:),bvarStruct%gru(iGRU)%var(:),statBvar_meta,waterYearTimeStep,err,message); call handle_err(err,message)
+  call calcStats(bvarStat%gru(iGRU)%var(:),bvarStruct%gru(iGRU)%var(:),statBvar_meta,netcdfTimeStep,err,message); call handle_err(err,message)
 
   ! write basin-average variables
-  call writeBasin(waterYearTimeStep,outputTimeStep,bvar_meta,bvarStat%gru(iGRU)%var,bvarStruct%gru(iGRU)%var,bvarChild_map,err,message); call handle_err(err,message)
+  call writeBasin(netcdfTimeStep,outputTimeStep,bvar_meta,bvarStat%gru(iGRU)%var,bvarStruct%gru(iGRU)%var,bvarChild_map,err,message); call handle_err(err,message)
 
  end do  ! (looping through GRUs)
 
  ! write current time to all files
- call WriteTime(waterYearTimeStep,outputTimeStep,time_meta,timeStruct%var,err,message)
+ call WriteTime(netcdfTimeStep,outputTimeStep,time_meta,timeStruct%var,err,message)
 
  ! increment output file timestep
  do iFreq = 1,nFreq
-  if (mod(waterYearTimeStep,outFreq(iFreq))==0) then
+  if (mod(netcdfTimeStep,outFreq(iFreq))==0) then
    outputTimeStep(iFreq) = outputTimeStep(iFreq) + 1
   end if
  end do
@@ -1022,7 +1041,7 @@ do modelTimeStep=1,numtim
  forcingStep=forcingStep+1
 
  ! increment the time index
- waterYearTimeStep = waterYearTimeStep+1
+ netcdfTimeStep = netcdfTimeStep+1
 
  !print*, 'PAUSE: in driver: testing differences'; read(*,*)
  !stop 'end of time step'
@@ -1086,6 +1105,7 @@ contains
  startGRU = integerMissing; nGRU = integerMissing; checkHRU = integerMissing; nHRU = integerMissing
  nGRU = integerMissing; nHRU = integerMissing
  iRunMode = iRunModeFull
+ ncMaxDay = 366
 
  ! loop through all command arguments
  nLocalArgument = 0
@@ -1093,7 +1113,7 @@ contains
   if (nLocalArgument>0) then; nLocalArgument = nLocalArgument -1; cycle; end if ! skip the arguments have been read 
   select case (trim(argString(iArgument)))
 
-   case ('-r', '--resume')
+   case ('-c', '--continue') ! TODO: this option will be deprecated after the explicit Euler and split operator solutions are implemented
     nLocalArgument = 0
     resumeFailSolver = .true.
     print "(A)", "Simulation will continue even if the solver does NOT converge."
@@ -1114,7 +1134,7 @@ contains
     output_fileSuffix=trim(argString(iArgument+1))
     print "(A)", "file_suffix is '"//trim(output_fileSuffix)//"'."
 
-   case ('-c', '--checkhru')
+   case ('-h', '--hru')
     ! define a single HRU run
     if (iRunMode == iRunModeGRU) call handle_err(1,"single-HRU run and GRU-parallelization run cannot be both selected.")
     iRunMode=iRunModeHRU
@@ -1145,18 +1165,57 @@ contains
      print '(A)', ' GRU-Parallelization run activated. '//trim(argString(iArgument+2))//' GRUs are selected for simulation.'
     end if
 
-   case ('-h','--help')
+   case ('-p', '--progress')
+    ! define the frequency to print progress
+    nLocalArgument = 1
+    ! check if the number of command line arguments is correct
+    if (iArgument+nLocalArgument>nArgument) call handle_err(1, "missing argument freqProgress; type 'summa.exe --help' for correct usage")
+    select case (trim(argString(iArgument+1)))
+     case ('m' , 'month'); ixProgress = ixProgress_im
+     case ('d' , 'day');   ixProgress = ixProgress_id
+     case ('h' , 'hour');  ixProgress = ixProgress_ih
+     case ('n' , 'never'); ixProgress = ixProgress_never
+     case default;         call handle_err(1,'unknown frequency to print progress')
+    end select 
+  
+   case ('-r', '--restart')
+    ! define the frequency to write restart files
+    nLocalArgument = 1
+    ! check if the number of command line arguments is correct
+    if (iArgument+nLocalArgument>nArgument) call handle_err(1, "missing argument freqRestart; type 'summa.exe --help' for correct usage")
+    select case (trim(argString(iArgument+1)))
+     case ('y' , 'year');  ixRestart = ixRestart_iy
+     case ('m' , 'month'); ixRestart = ixRestart_im
+     case ('d' , 'day');   ixRestart = ixRestart_id
+     case ('n' , 'never'); ixRestart = ixRestart_never
+     case default;         call handle_err(1,'unknown frequency to write restart files')
+    end select 
+  
+   case ('-o', '--output')
+    ! define the frequency to split netcdf files
+    nLocalArgument = 1
+    ! check if the number of command line arguments is correct
+    if (iArgument+nLocalArgument>nArgument) call handle_err(1, "missing argument freqOutput; type 'summa.exe --help' for correct usage")
+    select case (trim(argString(iArgument+1)))
+     case ('y' , 'year');  ixNetCDF = ixNetCDF_iy; ncMaxDay = 366
+     case ('m' , 'month'); ixNetCDF = ixNetCDF_im; ncMaxDay = 31
+     case ('d' , 'day');   ixNetCDF = ixNetCDF_id; ncMaxDay = 1
+     case ('n' , 'never'); ixNetCDF = ixNetCDF_never; ncMaxDay = -1
+     case default;         call handle_err(1,'unknown frequency to split netcdf files')
+    end select 
+ 
+   case ('--help')
     call printCommandHelp
 
    case default
     call printCommandHelp
-    call handle_err(1,'unknown command line option')
+    call handle_err(1, 'unknown command line option')
 
   end select
  end do  ! looping through command line arguments 
 
  ! check if master_file has been received.
- if (len(trim(summaFileManagerFile))==0) call handle_err(1,"master_file is not received; type 'summa.exe --help' for correct usage")
+ if (len(trim(summaFileManagerFile))==0) call handle_err(1, "master_file is not received; type 'summa.exe --help' for correct usage")
 
  ! set startGRU for full run
  if (iRunMode==iRunModeFull) startGRU=1
@@ -1169,14 +1228,17 @@ contains
  subroutine printCommandHelp()  
  implicit none
  ! command line usage
- print "(//A)",'Usage: summa.exe -m master_file [-s file_suffix] [-g startGRU countGRU] [-c checkHRU] [-r resume]'
+ print "(//A)",'Usage: summa.exe -m master_file [-s fileSuffix] [-g startGRU countGRU] [-h iHRU] [-r freqRestart] [-p freqProgress] [-c]'
  print "(A,/)",  ' summa.exe          summa executable'
  print "(A)",  'Running options:'
- print "(A)",  ' -m --master        path/name of master file (required)'
- print "(A)",  ' -s --suffix        Add file_suffix to the output files'
+ print "(A)",  ' -m --master        Define path/name of master file (required)'
+ print "(A)",  ' -s --suffix        Add fileSuffix to the output files'
  print "(A)",  ' -g --gru           Run a subset of countGRU GRUs starting from index startGRU'
- print "(A)",  ' -c --checkhru      Run a single HRU with index of checkHRU'
- print "(A)",  ' -r --resume        Continue simulation when solver failed convergence'
+ print "(A)",  ' -h --hru           Run a single HRU with index of iHRU'
+ print "(A)",  ' -c --continue      Continue simulation when solver failed convergence'
+ print "(A)",  ' -o --output        Define frequency [y,m,d] to split netcdf files'
+ print "(A)",  ' -r --restart       Define frequency [y,m,d] to write restart files'
+ print "(A)",  ' -p --progress      Define frequency [m,d,h] to print progress'
  stop 
  end subroutine printCommandHelp
 
