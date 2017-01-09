@@ -20,12 +20,10 @@
 
 module checkStruc_module
 USE nrtype
+USE globalData,only:integerMissing
 implicit none
 private
 public::checkStruc
-! define missing values
-integer(i4b),parameter :: missingInteger=-9999
-real(dp),parameter     :: missingDouble=-9999._dp
 contains
 
 
@@ -136,7 +134,6 @@ contains
   USE data_types,only:var_info 
   ! get index from character string
   USE get_ixname_module,only: get_ixUnknown! variable lookup structure
-  USE multiconst,only:integerMissing       ! missing integer value
   implicit none
   ! dummy variables
   integer(i4b),intent(in)   :: iStruct     ! index of data structure
@@ -147,6 +144,7 @@ contains
   integer(i4b)              :: iVar        ! index of variable within a data structure
   integer(i4b)              :: jVar        ! index of variable within a data structure (returned from the variable name)
   character(LEN=100)        :: typeName    ! name of variable type to be returned by get_ixUnknown
+  character(len=256)        :: cmessage    ! error message of downwind routine
   ! initialize error control
   err=0; message='checkPopulated/'
  
@@ -160,7 +158,8 @@ contains
    end if
 
    ! look for the populated variable
-   call get_ixUnknown(trim(metadata(iVar)%varname),typeName,jVar,err,message)
+   call get_ixUnknown(trim(metadata(iVar)%varname),typeName,jVar,err,cmessage)
+   if(err/=0)then; message=trim(message)//trim(cmessage); return; end if  ! (check for errors) 
 
    ! check that the variable was found at all
    if (jVar==integerMissing) then

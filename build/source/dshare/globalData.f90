@@ -27,6 +27,7 @@ MODULE globalData
  USE data_types,only:file_info       ! metadata for model forcing datafile
  USE data_types,only:par_info        ! default parameter values and parameter bounds
  USE data_types,only:var_info        ! metadata for variables in each model structure
+ USE data_types,only:flux2state      ! extended metadata to define flux-to-state mapping
  USE data_types,only:extended_info   ! extended metadata for variables in each model structure
  USE data_types,only:struct_info     ! summary information on all data structures 
  USE data_types,only:var_i           ! vector of integers 
@@ -49,15 +50,15 @@ MODULE globalData
  private
 
  ! define missing values
- real(dp),parameter,public                   :: quadMissing=-9999._qp   ! missing quadruple precision number
- real(dp),parameter,public                   :: realMissing=-9999._dp   ! missing double precision number
- integer(i4b),parameter,public               :: integerMissing=-9999    ! missing integer 
+ real(qp),parameter,public                   :: quadMissing    = nr_quadMissing    ! (from nrtype) missing quadruple precision number
+ real(dp),parameter,public                   :: realMissing    = nr_realMissing    ! (from nrtype) missing double precision number
+ integer(i4b),parameter,public               :: integerMissing = nr_integerMissing ! (from nrtype) missing integer 
 
  ! define limit checks
  real(dp),parameter,public                   :: verySmall=tiny(1.0_dp)  ! a very small number
  real(dp),parameter,public                   :: veryBig=1.e+20_dp       ! a very big number
 
- ! define algorithmix control parameters
+ ! define algorithmic control parameters
  real(dp),parameter,public                   :: dx = 1.e-8_dp            ! finite difference increment
 
  ! Define the model decisions
@@ -85,7 +86,9 @@ MODULE globalData
  type(var_info),save,public                  :: bvar_meta(maxvarBvar)   ! basin variables for aggregated processes
 
  ! ancillary metadata structures
- type(extended_info),save,public,allocatable :: averageFlux_meta(:)     ! timestep-average model fluxes
+ type(flux2state),   save,public             :: flux2state_orig(maxvarFlux)  ! named variables for the states affected by each flux (original)
+ type(flux2state),   save,public             :: flux2state_liq(maxvarFlux)   ! named variables for the states affected by each flux (liquid water)
+ type(extended_info),save,public,allocatable :: averageFlux_meta(:)          ! timestep-average model fluxes
 
  ! define summary information on all data structures
  integer(i4b),parameter                      :: nStruct=12              ! number of data structures
@@ -103,15 +106,22 @@ MODULE globalData
                    struct_info('flux',  'FLUX' , maxvarFlux ), &        ! the flux data structure
                    struct_info('deriv', 'DERIV', maxvarDeriv) /)        ! the model derivative data structure
 
- ! define named variables to describe the layer type
- integer(i4b),parameter,public               :: ix_soil=1001            ! named variable to denote a soil layer
- integer(i4b),parameter,public               :: ix_snow=1002            ! named variable to denote a snow layer
+ ! define named variables to describe the domain type
+ integer(i4b),parameter,public               :: iname_cas =1000         ! named variable to denote a canopy air space state variable
+ integer(i4b),parameter,public               :: iname_veg =1001         ! named variable to denote a vegetation state variable
+ integer(i4b),parameter,public               :: iname_soil=1002         ! named variable to denote a soil layer
+ integer(i4b),parameter,public               :: iname_snow=1003         ! named variable to denote a snow layer
 
  ! define named variables to describe the state varible type            
- integer(i4b),parameter,public               :: ixNrgState=2001         ! named variable defining the energy state variable
- integer(i4b),parameter,public               :: ixWatState=2002         ! named variable defining the total water state variable
- integer(i4b),parameter,public               :: ixMatState=2003         ! named variable defining the matric head state variable
- integer(i4b),parameter,public               :: ixMassState=2004        ! named variable defining the mass of water (currently only used for the veg canopy)
+ integer(i4b),parameter,public               :: iname_nrgCanair=2001    ! named variable defining the energy of the canopy air space
+ integer(i4b),parameter,public               :: iname_nrgCanopy=2002    ! named variable defining the energy of the vegetation canopy
+ integer(i4b),parameter,public               :: iname_watCanopy=2003    ! named variable defining the mass of total water on the vegetation canopy
+ integer(i4b),parameter,public               :: iname_liqCanopy=2004    ! named variable defining the mass of liquid water on the vegetation canopy
+ integer(i4b),parameter,public               :: iname_nrgLayer=3001     ! named variable defining the energy state variable for snow+soil layers
+ integer(i4b),parameter,public               :: iname_watLayer=3002     ! named variable defining the total water state variable for snow+soil layers
+ integer(i4b),parameter,public               :: iname_liqLayer=3003     ! named variable defining the liquid  water state variable for snow+soil layers
+ integer(i4b),parameter,public               :: iname_matLayer=3004     ! named variable defining the matric head state variable for soil layers
+ integer(i4b),parameter,public               :: iname_lmpLayer=3005     ! named variable defining the liquid matric potential state variable for soil layers
 
  ! define named variables to describe the form and structure of the band-diagonal matrices used in the numerical solver
  ! NOTE: This indexing scheme provides the matrix structure expected by lapack. Specifically, lapack requires kl extra rows for additional storage.
@@ -119,14 +129,7 @@ MODULE globalData
  integer(i4b),parameter,public               :: nRHS=1                  ! number of unknown variables on the RHS of the linear system A.X=B
  integer(i4b),parameter,public               :: ku=3                    ! number of super-diagonal bands
  integer(i4b),parameter,public               :: kl=4                    ! number of sub-diagonal bands
- integer(i4b),parameter,public               :: ixSup3=kl+1             ! index for the 3rd super-diagonal band
- integer(i4b),parameter,public               :: ixSup2=kl+2             ! index for the 2nd super-diagonal band
- integer(i4b),parameter,public               :: ixSup1=kl+3             ! index for the 1st super-diagonal band
- integer(i4b),parameter,public               :: ixDiag=kl+4             ! index for the diagonal band
- integer(i4b),parameter,public               :: ixSub1=kl+5             ! index for the 1st sub-diagonal band
- integer(i4b),parameter,public               :: ixSub2=kl+6             ! index for the 2nd sub-diagonal band
- integer(i4b),parameter,public               :: ixSub3=kl+7             ! index for the 3rd sub-diagonal band
- integer(i4b),parameter,public               :: ixSub4=kl+8             ! index for the 3rd sub-diagonal band
+ integer(i4b),parameter,public               :: ixDiag=kl+ku+1          ! index for the diagonal band
  integer(i4b),parameter,public               :: nBands=2*kl+ku+1        ! length of the leading dimension of the band diagonal matrix
 
  ! define named variables for the type of matrix used in the numerical solution.
@@ -135,7 +138,7 @@ MODULE globalData
 
  ! define indices describing the first and last layers of the Jacobian to print (for debugging)
  integer(i4b),parameter,public               :: iJac1=1                 ! first layer of the Jacobian to print
- integer(i4b),parameter,public               :: iJac2=10                ! last layer of the Jacobian to print
+ integer(i4b),parameter,public               :: iJac2=9                 ! last layer of the Jacobian to print
 
  ! define mapping structures
  type(gru2hru_map),allocatable,save,public   :: gru_struc(:)            ! gru2hru map ! NOTE: change variable name to be more self describing
