@@ -164,6 +164,7 @@ MODULE globalData
  ! output file information
  integer(i4b),dimension(maxFreq),save,public :: ncid                    ! netcdf output file id
  integer(i4b),save,public                    :: nFreq                   ! actual number of output files
+ integer(i4b),save,public                    :: ncMaxDay                ! maximum number of days in an output file
  integer(i4b),dimension(maxFreq),save,public :: outFreq                 ! frequency of all output files
 
 

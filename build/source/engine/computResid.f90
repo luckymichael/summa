@@ -252,6 +252,7 @@ contains
  ! check
  if(any(isNan(rVec)))then
   message=trim(message)//'we found some Indian bread (NaN)'
+  print *, rVec
   err=20; return
  endif
 

@@ -97,7 +97,7 @@ contains
   write(fstring,'(i5)') outFreq(iFreq)
   fstring = adjustl(fstring)
   fname = trim(infile)//'_'//trim(fstring)//'.nc'
-  call ini_create(nHRU,nSoil,trim(fname),ncid(iFreq),err,cmessage)
+  call ini_create(nHRU,nSoil,trim(fname),ncid(iFreq),outFreq(iFreq),err,cmessage)
   if(err/=0)then; message=trim(message)//trim(cmessage); return; end if
   print "(A,A)",'Created output file:',trim(fname)
  end do
@@ -138,11 +138,12 @@ contains
  ! **********************************************************************************************************
  ! private subroutine ini_create: initial create
  ! **********************************************************************************************************
- subroutine ini_create(nHRU,nSoil,infile,ncid,err,message)
+ subroutine ini_create(nHRU,nSoil,infile,ncid,freq,err,message)
  ! variables to define number of steps per file (total number of time steps, step length, etc.)
  USE multiconst,only:secprday           ! number of seconds per day
  USE globalData,only:data_step          ! time step of model forcing data (s)
  USE globalData,only:numtim             ! number of time steps
+ USE globalData,only:ncMaxDay           ! maximum number of days in an output file
  ! model decisions
  USE globalData,only:model_decisions    ! model decision structure
  USE var_lookup,only:iLookDECISIONS     ! named variables for elements of the decision structure
@@ -155,6 +156,7 @@ contains
  integer(i4b), intent(in)    :: nSoil                      ! number of soil layers in the first HRU (used to define fixed length dimensions)
  character(*),intent(in)     :: infile                     ! filename
  integer(i4b),intent(out)    :: ncid                       ! netcdf file id
+ integer(i4b),intent(in)     :: freq                       ! output frequency
  integer(i4b),intent(out)    :: err                        ! error code
  character(*),intent(out)    :: message                    ! error message
  ! define local variables
@@ -168,7 +170,7 @@ contains
  err=0;message="f-iniCreate/"
 
  ! identify length of the variable vector
- maxStepsPerFile = min(numtim, nint(366._dp * secprday/data_step) )
+ maxStepsPerFile = min(numtim, ceiling(ncMaxDay * secprday/data_step/freq) )
  select case(model_decisions(iLookDECISIONS%snowLayers)%iDecision)
   case(sameRulesAllLayers);    meanSnowLayersPerStep = 100
   case(rulesDependLayerIndex); meanSnowLayersPerStep = 5
