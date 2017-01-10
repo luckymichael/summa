@@ -596,7 +596,7 @@ contains
  err=0; message="vegNrgFlux/"
 
  ! set wind measurement height at distance above canopy
- uHeight = max(mHeight + heightCanopyTop, scalarSnowDepth)
+ uHeight = mHeight + max(heightCanopyTop, scalarSnowDepth)
 
  ! initialize printflag
  printflag = .false.
