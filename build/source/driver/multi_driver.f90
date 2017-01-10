@@ -729,7 +729,25 @@ do modelTimeStep=1,numtim
  end select
  if(printProgress) write(*,'(i4,1x,5(i2,1x))') timeStruct%var
 
- ! NOTE: this is done because of the check in coupled_em if computeVegFlux changes in subsequent time steps
+  ! query whether this timestep requires a re-start file
+ select case(ixRestart)
+  case(ixRestart_iy);    printRestart = (timeStruct%var(iLookTIME%im) == 1 .and. timeStruct%var(iLookTIME%id) == 1 .and. timeStruct%var(iLookTIME%ih) == 0  .and. timeStruct%var(iLookTIME%imin) == 0)
+  case(ixRestart_im);    printRestart = (timeStruct%var(iLookTIME%id) == 1 .and. timeStruct%var(iLookTIME%ih) == 0 .and. timeStruct%var(iLookTIME%imin) == 0)
+  case(ixRestart_id);    printRestart = (timeStruct%var(iLookTIME%ih) == 0 .and. timeStruct%var(iLookTIME%imin) == 0)
+  case(ixRestart_never); printRestart = .false.
+  case default; call handle_err(20,'unable to identify option for the restart file')
+ end select
+ if (modelTimeStep == numtim) printRestart = .true.
+
+ ! print a restart file if requested
+ if(printRestart)then
+  write(timeString,'(a,i4,3(a,i2.2))') '_',timeStruct%var(iLookTIME%iyyy),'-',timeStruct%var(iLookTIME%im),'-',timeStruct%var(iLookTIME%id),'-',timeStruct%var(iLookTIME%ih)
+  restartFile=trim(OUTPUT_PATH)//trim(OUTPUT_PREFIX)//'_'//trim('summaRestart')//trim(timeString)//trim(output_fileSuffix)//'.nc'
+  call writeRestart(restartFile,nGRU,nHRU,prog_meta,progStruct,indx_meta,indxStruct,err,message)
+  call handle_err(err,message) 
+ end if
+
+! NOTE: this is done because of the check in coupled_em if computeVegFlux changes in subsequent time steps
  !  (if computeVegFlux changes, then the number of state variables changes, and we need to reoranize the data structures)
  ! compute the exposed LAI and SAI and whether veg is buried by snow
  if(modelTimeStep==1)then  
@@ -1044,24 +1062,6 @@ do modelTimeStep=1,numtim
 
  !print*, 'PAUSE: in driver: testing differences'; read(*,*)
  !stop 'end of time step'
-
- ! query whether this timestep requires a re-start file
- select case(ixRestart)
-  case(ixRestart_iy);    printRestart = (timeStruct%var(iLookTIME%im) == 1 .and. timeStruct%var(iLookTIME%id) == 1 .and. timeStruct%var(iLookTIME%ih) == 0  .and. timeStruct%var(iLookTIME%imin) == 0)
-  case(ixRestart_im);    printRestart = (timeStruct%var(iLookTIME%id) == 1 .and. timeStruct%var(iLookTIME%ih) == 0 .and. timeStruct%var(iLookTIME%imin) == 0)
-  case(ixRestart_id);    printRestart = (timeStruct%var(iLookTIME%ih) == 0 .and. timeStruct%var(iLookTIME%imin) == 0)
-  case(ixRestart_never); printRestart = .false.
-  case default; call handle_err(20,'unable to identify option for the restart file')
- end select
- if (modelTimeStep == numtim) printRestart = .true.
-
- ! print a restart file if requested
- if(printRestart)then
-  write(timeString,'(a,i4,3(a,i2.2))') '_',timeStruct%var(iLookTIME%iyyy),'-',timeStruct%var(iLookTIME%im),'-',timeStruct%var(iLookTIME%id),'-',timeStruct%var(iLookTIME%ih)
-  restartFile=trim(OUTPUT_PATH)//trim(OUTPUT_PREFIX)//'_'//trim('summaRestart')//trim(timeString)//trim(output_fileSuffix)//'.nc'
-  call writeRestart(restartFile,nGRU,nHRU,prog_meta,progStruct,indx_meta,indxStruct,err,message)
-  call handle_err(err,message) 
- end if
 
 end do  ! (looping through time)
 
