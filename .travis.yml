@@ -14,7 +14,9 @@ addons:
       - gcc-6
       - libnetcdff-dev
       - liblapack-dev
-   
+
+before_install:
+  - source ci/summa_install_utils
 install:
    - summa_install
 script:
