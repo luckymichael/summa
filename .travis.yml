@@ -5,17 +5,16 @@ notifications:
 
 compiler: gfortran-6
 os: linux
+dist: xenial
+sudo: required
 env: TESTID='summa_linux'
 addons:
   apt:
-    sources:
-      - ubuntu-toolchain-r-test
     packages:
-      - liblapack-dev
       - gcc-6
-before_install:
-  - source ci/summa_install_utils
-  - summa_before_install
+      - libnetcdff-dev
+      - liblapack-dev
+   
 install:
    - summa_install
 script:
